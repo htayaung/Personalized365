@@ -1,0 +1,190 @@
+﻿@page
+@using Microsoft.Graph
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+
+    string GetTaskPriorityLabel(TodoTask task)
+    {
+        if (task.Importance == null)
+            return "Priority Level: NA";
+
+        return $"Priority Level: {Enum.GetName<Importance>(task.Importance.Value)}";
+    }
+}
+
+<div>
+    @if (User.Identity.IsAuthenticated)
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col-8">
+                    <h2>Email Summary</h2>
+                    @if (Model.SummarizedMessages != null && Model.SummarizedMessages.Any())
+                    {
+                        @foreach (var message in Model.SummarizedMessages)
+                        {
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        @message.Subject
+                                    </h5>
+                                    <h6 class="card-subtitle mb-2 text-muted">
+                                        @message.ReceivedUtcDateTime
+                                    </h6>
+                                    <p class="card-text">
+                                        <ul>
+                                            @foreach (var sentence in message.SummarySentences)
+                                            {
+                                                <li>@sentence</li>
+                                            }
+                                        </ul>
+                                    </p>
+
+                                    <button data-id="@message.Id" class="btn btn-primary btn-sm view-email">View</button>
+                                    <button data-id="@message.Id" class="btn btn-primary btn-sm add-to-do">Add to To Do</button>
+                                </div>
+                            </div>
+                            <br />
+                        }
+                    }
+                    else
+                    {
+                        <div>No Messages found</div>
+                    }
+                </div>
+
+                <div class="col-4">
+                    @*Todo*@
+                    <h2>To do</h2>
+                    @if (Model.TodoTasks != null && Model.TodoTasks.Any())
+                    {
+                        <ul class="list-group">
+                            @foreach (var todo in Model.TodoTasks)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">@todo.Title</div>
+                                        <small>@GetTaskPriorityLabel(todo)</small>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <div>No Tasks found</div>
+                    }
+
+                    <hr />
+                    @*Calendar Events*@
+                    <h2>Calendar Events</h2>
+                    @if (Model.Events != null && Model.Events.Any())
+                    {
+                        <ul class="list-group">
+                            @foreach (var evt in Model.Events)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-calendar-event" viewBox="0 0 16 16">
+                                                <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z" />
+                                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
+                                            </svg>
+                                            @evt.Subject
+                                        </div>
+                                        <small>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
+                                                <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z" />
+                                                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z" />
+                                            </svg>
+                                            @Model.FormatDateTimeTimeZone(evt.Start) - @Convert.ToDateTime(Model.FormatDateTimeTimeZone(evt.End)).ToString("hh:mm tt")
+                                        </small>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <div>No calendar events found</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @Html.AntiForgeryToken()
+
+        <div id="viewEmailModal" class="modal" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">View Email</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <partial name="_DialogBoxPartial" />
+    }
+    else
+    {
+        <a class="btn btn-primary btn-large" href="https://localhost:5001/signin-oidc">Click here to sign in</a>
+    }
+</div>
+
+@section Scripts {
+    <script type="text/javascript">
+        $(function () {
+            $(".view-email").click(function () {
+                var id = $(this).attr("data-id");
+
+                $.ajax({
+                    type: "GET",
+                    url: "/Index?handler=ViewEmail",
+                    data: { "id": id },
+                    success: function (response) {
+                        $("#viewEmailModal").find(".modal-body").html(response);
+                        $("#viewEmailModal").modal('show');
+                    },
+                    failure: function (response) {
+                        alert(response.responseText);
+                    },
+                    error: function (response) {
+                        alert(response.responseText);
+                    }
+                });
+            });
+
+            $(".add-to-do").click(function () {
+                var id = $(this).attr("data-id");
+
+                $.ajax({
+                    type: "POST",
+                    url: "/Index?handler=AddEmailToDo",
+                    beforeSend: function (xhr) {
+                        xhr.setRequestHeader("XSRF-TOKEN",
+                            $('input:hidden[name="__RequestVerificationToken"]').val());
+                    },
+                    data: { "id": id },
+                    success: function (response) {
+                        $("#dialogBoxModal").find(".modal-body").html(response);
+                        $("#dialogBoxModal").modal('show');
+                    },
+                    failure: function (response) {
+                        alert(response.responseText);
+                    },
+                    error: function (response) {
+                        alert(response.responseText);
+                    }
+                });
+            });
+        });
+    </script>
+}
